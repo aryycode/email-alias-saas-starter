@@ -1,6 +1,6 @@
 "use client";
 
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Code,
@@ -10,16 +10,20 @@ import {
   Globe,
   Palette,
   Package,
+  Mail,
+  Server,
+  Users,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AuthButtons, HeroAuthButtons } from "@/components/auth-buttons";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="bg-gradient-to-br from-indigo-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       {/* Hero Section */}
-      <div className="text-center py-12 sm:py-16 relative px-4">
+      <div className="text-center py-16 relative px-4">
         <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
           <div className="flex items-center gap-2 sm:gap-3">
             <AuthButtons />
@@ -27,23 +31,16 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
-          <Image
-            src="/codeguide-logo.png"
-            alt="CodeGuide Logo"
-            width={50}
-            height={50}
-            className="rounded-xl sm:w-[60px] sm:h-[60px]"
-          />
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 bg-clip-text text-transparent font-parkinsans">
-            Codeguide Starter Fullstack
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 bg-clip-text text-transparent mb-6">
+            Email Alias SaaS Platform
           </h1>
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto px-4 mb-8">
+            Create custom email aliases, manage multiple domains, and receive secure inbound emails all in one powerful dashboard. Perfect for businesses and professionals who need email privacy and organization.
+          </p>
+
+          <HeroAuthButtons />
         </div>
-        <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto px-4 mb-8">
-          A modern full-stack TypeScript starter with authentication, database, and UI components
-        </p>
-        
-        <HeroAuthButtons />
       </div>
 
       <main className="container mx-auto px-4 sm:px-6 pb-12 sm:pb-8 max-w-5xl">
@@ -170,6 +167,53 @@ export default function Home() {
           </div>
         </Card>
       </main>
+
+      {/* Features Section */}
+      <section className="py-12 px-4">
+        <div className="container mx-auto max-w-5xl">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-foreground mb-4">Powerful Email Management Features</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Everything you need to manage your email aliases and domains securely
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Custom Domains Feature */}
+            <Card className="flex flex-col items-center text-center p-6 hover:shadow-lg transition-shadow">
+              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center mb-4">
+                <Globe className="w-6 h-6 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+              </div>
+              <h3 className="text-xl font-semibold mb-3">Custom Domains</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Add your own custom domains and create professional email aliases. Support for multiple domains with DNS verification and SSL security.
+              </p>
+            </Card>
+
+            {/* Alias Management Feature */}
+            <Card className="flex flex-col items-center text-center p-6 hover:shadow-lg transition-shadow">
+              <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center mb-4">
+                <Users className="w-6 h-6 text-green-600 dark:text-green-400" aria-hidden="true" />
+              </div>
+              <h3 className="text-xl font-semibold mb-3">Alias Management</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Create and manage unlimited email aliases. Organize your communications with descriptive names and track all incoming messages in one place.
+              </p>
+            </Card>
+
+            {/* Secure Inbound Email Feature */}
+            <Card className="flex flex-col items-center text-center p-6 hover:shadow-lg transition-shadow">
+              <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center mb-4">
+                <Shield className="w-6 h-6 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+              </div>
+              <h3 className="text-xl font-semibold mb-3">Secure Inbound Email</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Receive emails securely through our encrypted webhook system. All attachments are safely stored and your data is protected with enterprise-grade security.
+              </p>
+            </Card>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
