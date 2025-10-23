@@ -1,117 +1,108 @@
-# Project Requirements Document: codeguide-starter
-
----
+# Project Requirements Document (PRD)
 
 ## 1. Project Overview
 
-The **codeguide-starter** project is a boilerplate web application that provides a ready-made foundation for any web project requiring secure user authentication and a post-login dashboard. It sets up the common building blocks—sign-up and sign-in pages, API routes to handle registration and login, and a simple dashboard interface driven by static data. By delivering this skeleton, it accelerates development time and ensures best practices are in place from day one.
+This project is an email alias management SaaS built on a modern full-stack template. Users can register custom sending and receiving domains, create email aliases, and view incoming messages in a secure dashboard. Behind the scenes, a Cloudflare Worker forwards inbound mail to our webhook, which parses, stores, and surfaces messages and attachments. This eliminates the need for users to expose their real inboxes, reducing spam and consolidating multiple email identities in one place.
 
-This starter kit is being built to solve the friction developers face when setting up repeated common tasks: credential handling, session management, page routing, and theming. Key objectives include: 1) delivering a fully working authentication flow (registration & login), 2) providing a gated dashboard area upon successful login, 3) establishing a clear, maintainable project structure using Next.js and TypeScript, and 4) demonstrating a clean theming approach with global and section-specific CSS. Success is measured by having an end-to-end login journey in under 200 lines of code and zero runtime type errors.
+We’re building this because people want more control over their email footprint and a centralized interface for handling custom domains and aliases. Key objectives are: 
 
----
+•  A smooth, secure signup and login experience.  
+•  A reliable DNS verification flow for custom domains.  
+•  Real-time or near-real-time delivery of inbound messages.  
+•  A clean inbox UI that safely renders HTML and attachments.  
+
+Success will be measured by the number of verified domains added, aliases created, and emails successfully received and displayed without errors.
 
 ## 2. In-Scope vs. Out-of-Scope
 
-### In-Scope (Version 1)
-- User registration (sign-up) form with validation
-- User login (sign-in) form with validation
-- Next.js API routes under `/api/auth/route.ts` handling:
-  - Credential validation
-  - Password hashing (e.g., bcrypt)
-  - Session creation or JWT issuance
-- Protected dashboard pages under `/dashboard`:
-  - `layout.tsx` wrapping dashboard content
-  - `page.tsx` rendering static data from `data.json`
-- Global application layout in `/app/layout.tsx`
-- Basic styling via `globals.css` and `dashboard/theme.css`
-- TypeScript strict mode enabled
+### In-Scope (v1)
 
-### Out-of-Scope (Later Phases)
-- Integration with a real database (PostgreSQL, MongoDB, etc.)
-- Advanced authentication flows (password reset, email verification, MFA)
-- Role-based access control (RBAC)
-- Multi-tenant or white-label theming
-- Unit, integration, or end-to-end testing suites
-- CI/CD pipeline and production deployment scripts
+•  User authentication and session management (signup, login, logout).  
+•  Dashboard with protected routes.  
+•  Domain management: add, list, verify via DNS TXT lookup.  
+•  Alias management under each verified domain.  
+•  Webhook endpoint for inbound email from Cloudflare Worker.  
+•  Parsing of raw email (headers, body, attachments) using mailparser.  
+•  Saving emails and attachments in PostgreSQL (with Drizzle ORM) and object storage.  
+•  Inbox UI: paginated list, detail view, read/unread marking.  
+•  Light/dark theme toggle (persisted preference).  
 
----
+### Out-of-Scope (Phase 2+)
+
+•  Outbound SMTP sending of emails.  
+•  Advanced analytics or reporting dashboards.  
+•  OAuth or SSO (e.g., Google, GitHub).  
+•  Native mobile apps (iOS/Android).  
+•  AI-driven spam filtering or classification.  
+•  Multi-tenant billing and subscription management.  
 
 ## 3. User Flow
 
-A new visitor lands on the root URL and sees a welcome page with options to **Sign Up** or **Sign In**. If they choose Sign Up, they fill in their email, password, and hit “Create Account.” The form submits to `/api/auth/route.ts`, which hashes the password, creates a new user session or token, and redirects them to the dashboard. If any input is invalid, an inline error message explains the issue (e.g., “Password too short”).
+A new user visits the landing page and clicks "Sign Up". They register with email and password (stored via Better Auth), then land on the protected `/dashboard` home screen. The sidebar shows links to "Domains" and "Inbox." They click "Domains" to add their first custom domain. A form asks for `example.com`; on submit, the frontend calls `POST /api/domains`. The server writes a pending record and returns the TXT record users must add in their DNS.
 
-Once authenticated, the user is taken to the `/dashboard` route. Here they see a sidebar or header defined by `dashboard/layout.tsx`, and the main panel pulls in static data from `data.json`. They can log out (if that control is present), but otherwise their entire session is managed by server-side cookies or tokens. Returning users go directly to Sign In, submit credentials, and upon success they land back on `/dashboard`. Any unauthorized access to `/dashboard` redirects back to Sign In.
+Once DNS is updated, the user clicks "Verify" next to that domain entry. The frontend calls `GET /api/domains/verify?domain=example.com`, and the backend checks `dns.promises.resolveTxt`. If the TXT record matches, the domain status updates to "Verified." Next, the user creates an alias under that domain. They navigate to "Aliases," click "New Alias," enter `news@example.com`, and save. The alias appears in the list.
 
----
+The user then tests inbound flow by sending mail to `news@example.com`. Cloudflare Worker receives it and posts to `/api/webhook/email-inbound`. The app validates the worker secret, parses the email, finds the user by recipient domain, inserts the email & attachments, and returns 201. Back in the dashboard, the user clicks "Inbox" to see the new message, clicks it to view safely rendered HTML in a sandbox or sanitized markup, and downloads attachments if any.
 
 ## 4. Core Features
 
-- **Sign-Up Page (`/app/sign-up/page.tsx`)**: Form fields for email & password, client-side validation, POST to `/api/auth`.
-- **Sign-In Page (`/app/sign-in/page.tsx`)**: Form fields for email & password, client-side validation, POST to `/api/auth`.
-- **Authentication API (`/app/api/auth/route.ts`)**: Handles both registration and login based on HTTP method, integrates password hashing (bcrypt) and session or JWT logic.
-- **Global Layout (`/app/layout.tsx` + `globals.css`)**: Shared header, footer, and CSS resets across all pages.
-- **Dashboard Layout (`/app/dashboard/layout.tsx` + `dashboard/theme.css`)**: Sidebar or top nav for authenticated flows, section-specific styling.
-- **Dashboard Page (`/app/dashboard/page.tsx`)**: Reads `data.json`, renders it as cards or tables.
-- **Static Data Source (`/app/dashboard/data.json`)**: Example dataset to demo dynamic rendering.
-- **TypeScript Configuration**: `tsconfig.json` with strict mode and path aliases (if any).
-
----
+-  **Authentication & Authorization**: Secure signup/login, HTTP-only cookies, session guard on all dashboard pages and API routes.  
+-  **Dashboard Layout**: Sidebar navigation, main content area, theming toggle.  
+-  **Domain CRUD + Verification**: API endpoints for create/list/delete, DNS TXT check using Node’s `dns.promises`.  
+-  **Alias Management**: CRUD for email aliases scoped to verified domains.  
+-  **Inbound Email Webhook**: Route at `/api/webhook/email-inbound`, secret validation, raw parsing with `mailparser`.  
+-  **Data Models**: Drizzle ORM schemas for `users`, `domains`, `aliases`, `emails`, `attachments`.  
+-  **Attachments Storage**: Stream to S3 or Cloudflare R2, store metadata in DB.  
+-  **Inbox UI**: Paginated list with sender, subject, timestamp, read/unread status; detail view with sanitized/sandboxed HTML.  
+-  **Notifications**: Toasts for success/error and new-email events (to be added in real-time phase).  
+-  **Theming**: Light/dark mode via `next-themes`, preference persisted.  
 
 ## 5. Tech Stack & Tools
 
-- **Framework**: Next.js (App Router) for file-based routing, SSR/SSG, and API routes.
-- **Language**: TypeScript for type safety.
-- **UI Library**: React 18 for component-based UI.
-- **Styling**: Plain CSS via `globals.css` (global reset) and `theme.css` (sectional styling). Can easily migrate to CSS Modules or Tailwind in the future.
-- **Backend**: Node.js runtime provided by Next.js API routes.
-- **Password Hashing**: bcrypt (npm package).
-- **Session/JWT**: NextAuth.js or custom JWT logic (to be decided in implementation).
-- **IDE & Dev Tools**: VS Code with ESLint, Prettier extensions. Optionally, Cursor.ai for AI-assisted coding.
-
----
+-  Frontend: Next.js (App Router), React, TypeScript.  
+-  Styling: Tailwind CSS, shadcn/ui components, Lucide React icons, next-themes.  
+-  Backend: Node.js (v18+), Next.js API routes, TypeScript.  
+-  Database: PostgreSQL, Drizzle ORM.  
+-  Auth: Better Auth (session cookies).  
+-  Email Parsing: mailparser library.  
+-  DNS Verification: Node’s `dns.promises.resolveTxt`.  
+-  Object Storage: AWS S3 or Cloudflare R2 SDK.  
+-  Containerization: Docker, docker-compose (Postgres service).  
+-  Deployment: Vercel (or any Node.js-friendly host).  
+-  Validation & Testing: Zod for schema validation, Vitest/Jest for unit/integration tests, Playwright for end-to-end.  
+-  IDE & Plugins: VS Code, Cursor AI for code suggestions, Windsurf for snippets (optional).  
 
 ## 6. Non-Functional Requirements
 
-- **Performance**: Initial page load under 200 ms on a standard broadband connection. API responses under 300 ms.
-- **Security**:
-  - HTTPS only in production.
-  - Proper CORS, CSRF protection for API routes.
-  - Secure password storage (bcrypt with salt).
-  - No credentials or secrets checked into version control.
-- **Scalability**: Structure must support adding database integration, caching layers, and advanced auth flows without rewiring core app.
-- **Usability**: Forms should give real-time feedback on invalid input. Layout must be responsive (mobile > 320 px).
-- **Maintainability**: Code must adhere to TypeScript strict mode. Linting & formatting enforced by ESLint/Prettier.
-
----
+-  **Performance**: API responses under 200ms; initial page load under 1s on 3G.  
+-  **Scalability**: Must support thousands of users and email events; database indexes on `domains`, `aliases`, `emails`.  
+-  **Security**: OWASP Top 10 compliance, secret key validation, input sanitization (XSS prevention), HTTPS only, HTTP-only cookies.  
+-  **Reliability**: Webhook idempotency, retry logic for DNS and storage writes.  
+-  **Usability**: Accessible (WCAG AA), responsive (mobile to desktop), clear validation/error messages.  
+-  **Compliance**: GDPR-friendly data handling, environment variables for secrets in `.env`.  
 
 ## 7. Constraints & Assumptions
 
-- **No Database**: Dashboard uses only `data.json`; real database integration is deferred.
-- **Node Version**: Requires Node.js >= 14.
-- **Next.js Version**: Built on Next.js 13+ App Router.
-- **Authentication**: Assumes availability of bcrypt or NextAuth.js at implementation time.
-- **Hosting**: Targets serverless or Node.js-capable hosting (e.g., Vercel, Netlify).
-- **Browser Support**: Modern evergreen browsers; no IE11 support required.
-
----
+-  Assumes Cloudflare Worker is set up to forward inbound mail via POST.  
+-  Requires Next.js App Router (v14+) and Node.js v18+.  
+-  PostgreSQL must run in Docker or external managed instance.  
+-  Drizzle ORM schema definitions will cover all tables and relations.  
+-  Object storage credentials provided via environment (`.env`).  
+-  No external SMTP service required for v1; inbound only.  
 
 ## 8. Known Issues & Potential Pitfalls
 
-- **Static Data Limitation**: `data.json` is only for demo. A real API or database will be needed to avoid stale data.
-  *Mitigation*: Define a clear interface for data fetching so swapping to a live endpoint is trivial.
+-  **Email Parsing Edge Cases**: Complex MIME structures can break `mailparser`.  
+  *Mitigation*: Write tests for multi-part emails, log parse failures.  
+-  **DNS Propagation Delays**: Users may click "Verify" before TXT records propagate.  
+  *Mitigation*: Retry with exponential backoff, show clear instructions.  
+-  **Large Attachments**: Streaming big files can exhaust memory.  
+  *Mitigation*: Use streaming APIs, enforce max size, upload directly to storage.  
+-  **XSS in Email HTML**: Malicious scripts in email content.  
+  *Mitigation*: Sandbox in `iframe` or sanitize with DOMPurify.  
+-  **API Rate Limits**: On high email volume, webhook may hit rate limits.  
+  *Mitigation*: Queue messages (e.g., BullMQ) or batch inserts.  
+-  **Transactional Integrity**: Partial failures (DB write + upload).  
+  *Mitigation*: Use two-phase commit or compensating cleanup logic on failure.  
 
-- **Global CSS Conflicts**: Using global styles can lead to unintended overrides.
-  *Mitigation*: Plan to migrate to CSS Modules or utility-first CSS in Phase 2.
-
-- **API Route Ambiguity**: Single `/api/auth/route.ts` handling both sign-up and sign-in could get complex.
-  *Mitigation*: Clearly branch on HTTP method (`POST /register` vs. `POST /login`) or split into separate files.
-
-- **Lack of Testing**: No test suite means regressions can slip in.
-  *Mitigation*: Build a minimal Jest + React Testing Library setup in an early iteration.
-
-- **Error Handling Gaps**: Client and server must handle edge cases (network failures, malformed input).
-  *Mitigation*: Define a standard error response schema and show user-friendly messages.
-
----
-
-This PRD should serve as the single source of truth for the AI model or any developer generating the next set of technical documents: Tech Stack Doc, Frontend Guidelines, Backend Structure, App Flow, File Structure, and IDE Rules. It contains all functional and non-functional requirements with no ambiguity, enabling seamless downstream development.
+This document should serve as the single source of truth for all subsequent technical designs and implementation steps. Any changes or additions must map back clearly to these requirements to avoid scope confusion.

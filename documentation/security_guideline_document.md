@@ -1,116 +1,150 @@
-# Security Guidelines for codeguide-starter
+# Security Guidelines for email-alias-saas-starter
 
-This document defines mandatory security principles and implementation best practices tailored to the **codeguide-starter** repository. It aligns with Security-by-Design, Least Privilege, Defense-in-Depth, and other core security tenets. All sections reference specific areas of the codebase (e.g., `/app/api/auth/route.ts`, CSS files, environment configuration) to ensure practical guidance.
-
----
-
-## 1. Security by Design
-
-• Embed security from day one: review threat models whenever adding new features (e.g., new API routes, data fetching).
-• Apply “secure defaults” in Next.js configuration (`next.config.js`), enabling strict mode and disabling debug flags in production builds.
-• Maintain a security checklist in your PR template to confirm that each change has been reviewed against this guideline.
+This document outlines the security principles, controls, and best practices to follow when developing, configuring, and operating the `email-alias-saas-starter` application. It is organized according to core security domains and provides actionable recommendations tailored to this project’s architecture.
 
 ---
 
-## 2. Authentication & Access Control
+## 1. Authentication & Access Control
 
-### 2.1 Password Storage
-- Use **bcrypt** (or Argon2) with a per-user salt to hash passwords in `/app/api/auth/route.ts`.
-- Enforce a strong password policy on both client and server: minimum 12 characters, mixed case, numbers, and symbols.
+•  **Strong Credential Policies**  
+   – Enforce minimum password length (12+ characters), complexity (uppercase, lowercase, digits, symbols), and periodic rotation for service and administrative accounts.  
+   – Leverage Better Auth’s built-in policies or extend them to reject common/compromised passwords.  
 
-### 2.2 Session Management
-- Issue sessions via Secure, HttpOnly, SameSite=strict cookies. Do **not** expose tokens to JavaScript.
-- Implement absolute and idle timeouts. For example, invalidate sessions after 30 minutes of inactivity.
-- Protect against session fixation by regenerating session IDs after authentication.
+•  **Secure Session Management**  
+   – Store session tokens in secure, HTTP-only cookies with the `Secure` and `SameSite=Strict` attributes.  
+   – Enforce both idle and absolute session timeouts (e.g., idle: 15m, absolute: 8h).  
+   – Invalidate sessions on logout or password change to prevent session fixation.  
 
-### 2.3 Brute-Force & Rate Limiting
-- Apply rate limiting at the API layer (e.g., using `express-rate-limit` or Next.js middleware) on `/api/auth` to throttle repeated login attempts.
-- Introduce exponential backoff or temporary lockout after N failed attempts.
+•  **Role-Based Access Control (RBAC)**  
+   – Define roles (e.g., `user`, `admin`, `support`) in your database and assign permissions for each API route and UI action.  
+   – Implement server-side authorization checks in your Next.js API middleware (e.g., wrap `/api/domains`, `/api/emails`, `/api/webhook` routes) to ensure only authorized roles can perform sensitive operations.  
 
-### 2.4 Role-Based Access Control (Future)
-- Define user roles in your database model (e.g., `role = 'user' | 'admin'`).
-- Enforce server-side authorization checks in every protected route (e.g., in `dashboard/layout.tsx` loader functions).
+•  **Multi-Factor Authentication (MFA)**  
+   – Offer optional MFA (TOTP or SMS) for users managing domains or viewing incoming email data.  
+   – Integrate a trusted library (e.g., `otplib`) or third-party provider to manage TOTP secrets and verification flows.  
+
+## 2. Input Handling & Processing
+
+•  **Schema-Based Validation**  
+   – Use a validation library (e.g., Zod) for all API request bodies and webhook payloads.  
+   – Define strict schemas for domain creation (`name`, `type`), alias provisioning, email metadata, and the inbound webhook’s raw content.  
+
+•  **Prevent Injection Attacks**  
+   – Interact with PostgreSQL exclusively through Drizzle ORM’s parameterized queries.  
+   – Never construct raw SQL strings with user input.  
+   – For any dynamic DNS validation, strictly validate domain names against a whitelist pattern (e.g., `^[a-z0-9.-]+\.[a-z]{2,}$`).  
+
+•  **Sanitize and Encode Output**  
+   – When rendering email bodies or domain names in React, apply context-aware encoding or sanitize HTML with DOMPurify before injecting into the DOM.  
+
+•  **Secure File Uploads & Attachments**  
+   – Validate attachment MIME types and enforce file size limits.  
+   – Store attachments outside the public webroot or in a separate object-storage bucket with restricted read/write policies.  
+   – Scan uploaded files for malware using a scanning service or virus-scan library.  
+
+## 3. Data Protection & Privacy
+
+•  **Encryption in Transit & At Rest**  
+   – Enforce HTTPS (TLS 1.2+) across all Next.js pages and API routes.  
+   – Configure HSTS (`Strict-Transport-Security`) with a long max-age and subdomain inclusion.  
+   – Encrypt database data at rest by enabling PostgreSQL’s file-system encryption or using a managed database with encryption enabled.  
+
+•  **Secure Secrets Management**  
+   – Store all secrets (e.g., `WORKER_SECRET_KEY`, database credentials, object storage keys) in a vault or cloud provider’s secret manager—never in source code or `.env` files under version control.  
+   – Rotate secrets on a regular schedule and revoke immediately if compromised.  
+
+•  **Data Minimization & Masking**  
+   – Return only necessary fields in API responses (avoid exposing full PII unless required).  
+   – Mask or redact sensitive data (e.g., email addresses, full names) in logs and error messages.  
+
+## 4. API & Service Security
+
+•  **Endpoint Protection**  
+   – Require authentication on every API route under `/api/*`.  
+   – For the inbound webhook (`/api/webhook/email-inbound`), validate a strong secret using a constant-time comparison and return `401 Unauthorized` on failure.  
+
+•  **Rate Limiting & Throttling**  
+   – Implement rate limiting on public endpoints (e.g., sign-up, sign-in) to mitigate brute-force and credential-stuffing attacks.  
+   – Apply stricter limits to the inbound webhook to prevent denial-of-service (e.g., max 100 requests/min per IP).  
+
+•  **CORS & CSRF**  
+   – Configure CORS to allow only your sanctioned client origins.  
+   – Use anti-CSRF tokens for state-changing requests in the dashboard and API calls.  
+
+•  **API Versioning**  
+   – Prefix your routes (e.g., `/api/v1/domains`, `/api/v1/emails`) to manage breaking changes and deprecations securely.  
+
+## 5. Web Application Security Hygiene
+
+•  **Security Headers**  
+   – `Content-Security-Policy`: Restrict scripts to self and trusted CDNs, sandbox iframes for email views.  
+   – `X-Frame-Options: DENY` or CSP `frame-ancestors 'none'` to prevent clickjacking.  
+   – `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer-when-downgrade`.  
+
+•  **Cookie Security**  
+   – Set cookies as `HttpOnly`, `Secure`, `SameSite=Strict` to prevent XSS/CSRF attacks.  
+
+•  **Avoid Client-Side Storage of Sensitive Data**  
+   – Do not store tokens, secrets, or PII in `localStorage` or `sessionStorage`.  
+
+## 6. Infrastructure & Configuration Management
+
+•  **Harden Docker & Containers**  
+   – Run Node processes as a non-root user inside containers.  
+   – Minimize base images and remove unnecessary packages.  
+   – Mount secrets as read-only files (e.g., Docker secrets) rather than environment variables when possible.  
+
+•  **Secure Database Configuration**  
+   – Use a dedicated database user with least privileges (e.g., separate `read_only` and `write` roles).  
+   – Enforce SSL/TLS connections to the PostgreSQL instance.  
+
+•  **Change Default Credentials**  
+   – Ensure any default admin accounts or ports are disabled or renamed in production.  
+
+•  **Automated Patch Management**  
+   – Regularly update the OS, Node.js runtime, Next.js, and all dependencies.  
+   – Integrate continuous scanning (e.g., Dependabot, Snyk) to catch vulnerable packages.  
+
+## 7. Dependency Management
+
+•  **Vet Third-Party Libraries**  
+   – Choose well-maintained packages with active communities.  
+   – Review dependency changelogs and vulnerability advisories before upgrading.  
+
+•  **Deterministic Builds**  
+   – Commit lockfiles (`package-lock.json`) and regenerate them only after review.  
+
+•  **Minimize Attack Surface**  
+   – Remove unused dependencies (e.g., test frameworks) from production bundles.  
+
+## 8. Logging, Monitoring & Incident Response
+
+•  **Secure Logging**  
+   – Log failed authentication attempts, CSRF violations, and webhook signature mismatches.  
+   – Do not log PII or raw email content; log only metadata (timestamps, userId, domain).  
+
+•  **Monitoring & Alerts**  
+   – Configure real-time alerts for anomalous spikes in webhook failures or login attempts.  
+   – Use a centralized logging/monitoring service (e.g., ELK, Datadog).  
+
+•  **Incident Response Plan**  
+   – Define processes for secret/key rotation, user notifications, and service recovery.  
+
+## 9. Developer Best Practices
+
+•  **Code Reviews & Security Audits**  
+   – Mandate peer reviews with a security checklist for every pull request.  
+   – Periodically perform threat modeling sessions for new features (e.g., email parsing, object storage integration).  
+
+•  **Testing Strategy**  
+   – Develop unit tests for validation logic and API handlers.  
+   – Create integration tests simulating Cloudflare Worker webhook requests and DNS verification flows.  
+   – Perform regular static analysis and SAST scans on the codebase.  
+
+•  **Documentation & Training**  
+   – Document security controls and configuration steps in the project’s README or a dedicated `SECURITY.md`.  
+   – Provide onboarding training on secure coding practices and incident response.  
 
 ---
 
-## 3. Input Handling & Processing
-
-### 3.1 Validate & Sanitize All Inputs
-- On **client** (`sign-up/page.tsx`, `sign-in/page.tsx`): perform basic format checks (email regex, password length).
-- On **server** (`/app/api/auth/route.ts`): re-validate inputs with a schema validator (e.g., `zod`, `Joi`).
-- Reject or sanitize any unexpected fields to prevent injection attacks.
-
-### 3.2 Prevent Injection
-- If you introduce a database later, always use parameterized queries or an ORM (e.g., Prisma) rather than string concatenation.
-- Avoid dynamic `eval()` or template rendering with unsanitized user input.
-
-### 3.3 Safe Redirects
-- When redirecting after login or logout, validate the target against an allow-list to prevent open redirects.
-
----
-
-## 4. Data Protection & Privacy
-
-### 4.1 Encryption & Secrets
-- Enforce HTTPS/TLS 1.2+ for all front-end ↔ back-end communications.
-- Never commit secrets—use environment variables and a secrets manager (e.g., AWS Secrets Manager, Vault).
-
-### 4.2 Sensitive Data Handling
-- Do ​not​ log raw passwords, tokens, or PII in server logs. Mask or redact any user identifiers.
-- If storing PII in `data.json` or a future database, classify it and apply data retention policies.
-
----
-
-## 5. API & Service Security
-
-### 5.1 HTTPS Enforcement
-- In production, redirect all HTTP traffic to HTTPS (e.g., via Vercel’s redirect rules or custom middleware).
-
-### 5.2 CORS
-- Configure `next.config.js` or API middleware to allow **only** your front-end origin (e.g., `https://your-domain.com`).
-
-### 5.3 API Versioning & Minimal Exposure
-- Version your API routes (e.g., `/api/v1/auth`) to handle future changes without breaking clients.
-- Return only necessary fields in JSON responses; avoid leaking internal server paths or stack traces.
-
----
-
-## 6. Web Application Security Hygiene
-
-### 6.1 CSRF Protection
-- Use anti-CSRF tokens for any state-changing API calls. Integrate Next.js CSRF middleware or implement synchronizer tokens stored in cookies.
-
-### 6.2 Security Headers
-- In `next.config.js` (or a custom server), add these headers:
-  - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`
-  - `X-Content-Type-Options: nosniff`
-  - `X-Frame-Options: DENY`
-  - `Referrer-Policy: no-referrer-when-downgrade`
-  - `Content-Security-Policy`: restrict script/style/src to self and trusted CDNs.
-
-### 6.3 Secure Cookies
-- Set `Secure`, `HttpOnly`, `SameSite=Strict` on all cookies. Avoid storing sensitive data in `localStorage`.
-
-### 6.4 Prevent XSS
-- Escape or encode all user-supplied data in React templates. Avoid `dangerouslySetInnerHTML` unless content is sanitized.
-
----
-
-## 7. Infrastructure & Configuration Management
-
-- Harden your hosting environment (e.g., Vercel/Netlify) by disabling unnecessary endpoints (GraphQL/GraphiQL playgrounds in production).
-- Rotate secrets and API keys regularly via your secrets manager.
-- Maintain minimal privileges: e.g., database accounts should only have read/write on required tables.
-- Keep Node.js, Next.js, and all system packages up to date.
-
----
-
-## 8. Dependency Management
-
-- Commit and maintain `package-lock.json` to guarantee reproducible builds.
-- Integrate a vulnerability scanner (e.g., GitHub Dependabot, Snyk) to monitor and alert on CVEs in dependencies.
-- Trim unused packages; each added library increases the attack surface.
-
----
-
-Adherence to these guidelines will ensure that **codeguide-starter** remains secure, maintainable, and resilient as it evolves. Regularly review and update this document to reflect new threats and best practices.
+Adhering to these guidelines will help ensure that the `email-alias-saas-starter` application is built and maintained with a robust security posture, protecting both your infrastructure and user data from emerging threats.
