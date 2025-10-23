@@ -15,10 +15,12 @@ import {
   IconFolder,
   IconHelp,
   IconListDetails,
+  IconMail,
   IconReport,
   IconSearch,
   IconSettings,
   IconUsers,
+  IconWorld,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -39,13 +41,18 @@ const staticData = {
   navMain: [
     {
       title: "Dashboard",
-      url: "#",
+      url: "/dashboard",
       icon: IconDashboard,
     },
     {
-      title: "Lifecycle",
-      url: "#",
-      icon: IconListDetails,
+      title: "Inbox",
+      url: "/dashboard/inbox",
+      icon: IconMail,
+    },
+    {
+      title: "Domains",
+      url: "/dashboard/domains",
+      icon: IconWorld,
     },
     {
       title: "Analytics",
